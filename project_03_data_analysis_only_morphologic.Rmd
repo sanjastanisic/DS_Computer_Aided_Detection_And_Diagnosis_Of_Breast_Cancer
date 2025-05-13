@@ -1,0 +1,667 @@
+---
+title: "Computer AidedDetection and DIagnosis of Breast Cancer"
+author: "Sanja Stanisic, Universita' degli Studi di Milano Bicocca, CdLM Data Science, n. 800409"
+date: "17. April 2021."
+output:
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '5'
+  ioslides_presentation:
+    css:
+    - css/fonts.css
+    - css/custom.css
+    - css/title-slide.css
+    - css/slide-background.css
+    includes:
+      before_body: html/title.html
+    toc: yes
+    transition: default
+    widescreen: yes
+  beamer_presentation:
+    colortheme: lily
+    fig_caption: no
+    fig_height: 6
+    fig_width: 7
+    fonttheme: structurebold
+    theme: Hannover
+    toc: yes
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+  slidy_presentation:
+    highlight: default
+  prettydoc::html_pretty:
+    df_print: paged
+    highlight: vignette
+    theme: architect
+    toc: yes
+    toc_depth: 5
+course: Data Science Lab
+link-citations: true
+bibliography: biblio.bib
+
+---
+
+```{r setup, include=FALSE}
+# Use 'verbatim = TRUE' as chunk option to show chunk code as is
+if(require(knitr)==FALSE) install.packages("knitr")
+hook_source_def = knit_hooks$get('source')
+knit_hooks$set(source = function(x, options){
+  if (!is.null(options$verbatim) && options$verbatim){
+    opts = gsub(",\\s*verbatim\\s*=\\s*TRUE\\s*", "", options$params.src)
+    bef = sprintf('\n\n    ```{r %s}\n', opts, "\n")
+    stringr::str_c(bef, paste(knitr:::indent_block(x, "    "), collapse = '\n'), "\n    ```\n")
+  } else {
+     hook_source_def(x, options)
+  }
+})
+```
+
+## Data for analyze 
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+library(data.table)
+library(dplyr)
+
+filePath <- "results-p03-full.csv"
+
+all_dt <- fread(filePath, stringsAsFactors = TRUE, dec=".")
+
+tibble(all_dt)
+
+```
+
+This dataset consists of 1333 instances with 15 features:
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+all_dt$PatientId <- NULL
+all_dt$FullFilePath <- NULL
+all_dt$ROIFilePath <- NULL
+
+all_dt$LeftOrRightBrest <-  as.numeric(all_dt$LeftOrRightBrest)
+all_dt$LeftOrRightBrest <- NULL
+
+all_dt$ImageView <- as.numeric(all_dt$ImageView)
+all_dt$ImageView <- NULL
+
+all_dt$TestOrTraining <- as.numeric(all_dt$TestOrTraining)
+all_dt$TestOrTraining <- NULL
+
+all_dt$BrestDensity <- NULL
+
+all_dt$CalcType <- as.numeric(all_dt$CalcType)
+all_dt$CalcType <- NULL
+
+all_dt$CalcDistribution <- as.numeric(all_dt$CalcDistribution)
+all_dt$CalcDistribution <- NULL
+
+all_dt$Patology <- as.numeric(all_dt$Patology)
+
+head(all_dt)
+
+```
+
+### Preprocessing
+
+Firstly, data should be set in adequate format.
+
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+all_dt_ex <- fread(filePath, stringsAsFactors = TRUE, dec=".")
+all_dt_ex$PatientId <- NULL
+all_dt_ex$FullFilePath <- NULL
+all_dt_ex$ROIFilePath <- NULL
+
+all_dt_ex$LeftOrRightBrest <-  as.numeric(all_dt_ex$LeftOrRightBrest)
+all_dt_ex$LeftOrRightBrest <- cut(all_dt_ex$LeftOrRightBrest, 2, labels=c('LEFT', 'RIGHT'))
+all_dt_ex$LeftOrRightBrest <- NULL
+
+all_dt_ex$ImageView <- as.numeric(all_dt_ex$ImageView)
+all_dt_ex$ImageView <- cut(all_dt_ex$ImageView, 2, labels=c('CC', 'MLO'))
+all_dt_ex$ImageView <- NULL
+
+all_dt_ex$TestOrTraining <- NULL
+
+all_dt_ex$BrestDensity <- NULL
+
+all_dt_ex$CalcType <- NULL
+
+all_dt_ex$CalcDistribution <- NULL
+
+tibble(all_dt_ex)
+```
+
+
+After that, it should be checked is there missing values in dataset.
+
+```{r echo=FALSE, message=TRUE, warning=FALSE, include=TRUE}
+colSums(is.na(all_dt)) %>% show() # 0 in respective coumn indicates that there are no missing data
+```
+Obtained result indicate that thete is no misisng values. Therefore, there is no need to correct existng data.
+
+### Data exploration
+
+Since the research question is to predict if the patient has malignant changes, so variable "pathology" to be the dependent variable in this analysis. That variable is treated as a discrete attribute and its prediction will be executed as classification process.
+
+
+
+Firstly, distribution of "pathology" is examinated.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("pathology")
+all_dt$Patology %>% table()
+
+library(ggplot2)
+
+ggplot(all_dt,aes(x =Patology)) + 
+  geom_bar(width = 0.4,fill =c("green","red")) + 
+  geom_text(stat = 'count', aes(label =..count..),vjust =-0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Pathology distribution") 
+
+```
+
+
+Corelation among variables in dataset is calculated and displayed on the following diagram. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(data.table)
+library(tidyverse)
+
+all_df <- as.data.frame(all_dt) 
+
+M <- cor(all_df)
+M1 <- round(M, 3)
+M1
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(corrplot)
+
+M <- cor(all_df)
+corrplot(M, method = "circle")
+```
+
+In this diagram, positive corelation is marked with different shades of blue, while negative correlation is marked with different shades of red. More intesive color indicate that correlation is higher.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+library(lares)
+
+corr_var(all_df, # name of dataset
+  Patology, # name of variable to focus on
+  top = 5 # display top 5 correlations
+)
+```
+
+
+### Models
+
+Different Machine Learning models were chosen for predicting the "target" variable. Here is the list of models that are used in this report:
+
+- k Nearest Neihbours (**k-nn**), described in [@murphy pp. 16--18]. An object is classified by a plurality vote of its neighbors, with the object being assigned to the class most common among its k nearest neighbors (k is a positive integer, typically small). I 
+
+- Naive Bayes (**nb**), explained in [@murphy pp. 82--95]. It is simple "probabilistic classifier" based on applying Bayes' theorem, with strong (e.g. naïve) assumptions of independence between the features. In other words, naive Bayes classifier assume that the value of a particular feature is independent of the value of any other feature, given the class variable.
+
+- SVM with Linear Kernel (**svm-l**), described in [@murphy pp.  482--486]. Training algorithm of SVM builds a model that assigns new examples to one category or the other, making it a non-probabilistic binary linear classifier.
+
+- SVM with Radial Kernel (**svm-r**), also described in [@murphy pp. 498--505]. It is using the kernel trick, which implicitly maps kernel inputs into high-dimensional feature spaces where features are linearly separable. In this case kernel is defined with Gaussian radial basis function, given by formula: 
+
+$$k(x_{i}, x_{j}) = e ^ {- \sigma {|x_{i} - x_{j}|}^2 }$$ 
+
+
+- Random Forest (**rf**), also described in [@murphy pp. 550--553]. Random forest operate by constructing a multitude of decision trees at training time and outputting the value that is mean/average prediction of the individual trees.
+
+
+### Implementation and evaluation
+
+It is clear that various different alternatives and experiments should be created during ML process implementation.
+
+Because of its popularity, efficiency, simplicity and flexibility and because of author's previous experience, R language and environment for statistical computing and graphics [@rfoundations] is used to implement the ML process. A decision tree is a flowchart-like structure in which each internal node represents a "test" on an attribute, each branch represents the outcome of the test, and each leaf node represents a class label (decision taken after computing all attributes). It is clear that  paths from root to leaf represent classification rules.
+
+The following ML predictor models are developed with R functions:
+
+- Function 'knn'[@rfunknn] in library 'class'[@rbibclass] is used for k-nn model realization.
+
+- Function 'NaiveBayes'[@rfunnaivebayes] in library 'klaR'[@rbibklar] is used for nb model realization.
+
+- Function 'ksvm' [@rfunkvsm] in library 'kernlab'[@rbibkernlab] with parameter kernel = vanilladot() that represents linear kernel, is used for svm-l model realization.
+
+- Function 'ksvm'in library 'kernlab' with parameter kernel = "rbfdot" - which represents radial kernel, is used for svm-r model realization.
+
+- Function 'randomForest'[@rfunrandomforest] in library 'randomForest'[@rbibrandomforest] is used for rf model realization.
+
+Last, but not the least, R function 'train' [@rfuntrain] in library 'caret' [@rbibcaret] is used as umbrella that covers all the previously mentioned R functions and libraries for ML. They enables handling of a various learning models and functions in a uniform manner. In this moment, more than 230 classification and regression models are 'out-of-a-box' available for use with 'caret' and all of them are enlisted in [@kuhnam].
+
+Developed models are compared using k-fold validation [@murphy pp. 201--210], with value of parameter k is set to 10. Selected 10-fold validation is realized with caret R functions. In order to achieve exactly the same conditions for comparison among developed ML methods, in all 10-fold validation scenarios, random generator is set on predefined value 155294099.
+
+In order to evaluate quality of the selected ML regression methods, various measures [@murphy pp. 176--194] are used.
+
+The following overall measures are calculated for ML models:
+
+For measuring the performance of algorithms, sensitivity (or recall), specificity and accuracy were used because these three criteria are used more in the medical field.
+
+For calculation of sensitivity, specificity and accuracy confusion matrix is required. In the following table, a confusion matrix is shown:
+
+|                          | Actual class is C1    | Actual class is C2     |
+| :----------------------- | :-------------------: | ---------------------: |
+|  Predicted class is *C1* | True positive ($TP$)  | False positive ($FP$)  |
+|  Predicted class is *C2* | False negative ($TN$) | True negative ($TN$)   |
+
+Cells in confusion matrix have the following meaning [@alizedah2019]:
+ - Actual class is the class which determined by angiography and it is existed in dataset. 
+ - Predicted class is the one which is predicted by algorithms.
+ - $TP$ is number of samples of class C1 which has been correctly classified.
+ - $TN$ is number of samples of class C2 which has been correctly classified.
+ - $FN$ is number of samples of class C1 which has been falsely classified as C2.
+ - $FP$ is number of samples of class C2 which has been falsely classified as C1.
+
+According to confusion matrix, sensitivity, specificity and accuracy are calculated as follows:
+
+
+$$ Specificity = \frac{TN}{TN+FP} $$
+
+$$ Sensitivity = \frac{TP}{TP+FN}  $$
+$$ Accuracy = \frac{TP+TN}{TP+TN+FP+FN}  $$
+
+
+Quality of the classification algorithm is often displayed by ROC (receiver operating characteristic) curve. It is a diagram  showing the performance of a classification model at all classification thresholds. This curve plots two parameters true positive rate ($TPR$) and false positive rate ($FPR$).
+
+True Positive Rate ($TPR$) is a synonym for recall and is defined as follows:
+
+$$ TPR = \frac{TP}{TP+FN}  $$
+
+False Positive Rate ($FPR$) is defined as follows:
+
+$$ FPR = \frac{FP}{TN+FP}  $$
+
+An ROC curve plots $TPR$ vs. $FPR$ at different classification thresholds. Lowering the classification threshold classifies more items as positive, thus increasing both false positives and true positives. 
+
+Area Under the ROC Curve (AUC) measures the entire two-dimensional area underneath the entire ROC curve (think integral calculus) from (0,0) to (1,1).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# Prepare data set for cross validation and ROC calculation
+all_dt$Class <- factor( ifelse(all_dt$Patology==1, 'BENIGN', 'MALIGNANT') )
+all_dt$Patology <- NULL
+```
+
+```{r echo=FALSE, message=FALSE, include=FALSE}
+
+library(caret)
+
+train_control <- trainControl(
+  method="repeatedcv", 
+  number=10,
+  repeats = 10,
+  classProbs = TRUE,  
+  summaryFunction = twoClassSummary)
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the k-nn model:
+
+library(class)
+
+set.seed(155294099)
+model_k_nn <- train(
+  Class~., 
+  data=all_dt, 
+  trControl=train_control,
+  metric = "ROC",
+  method="knn",
+  na.action = na.omit
+  )
+```
+
+Display info about k-nn model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_k_nn$method
+model_k_nn$finalModel
+model_k_nn$resample$ROC
+confusionMatrix(model_k_nn)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_k_nn)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix k-nn")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the nb model:
+
+library(klaR)
+
+set.seed(155294099)
+model_nb <- train(
+  Class~., 
+  data=all_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="nb",
+  na.action = na.omit
+  )
+```
+
+Display info about nb model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_nb$method
+model_nb$finalModel
+model_nb$resample$ROC
+confusionMatrix(model_nb)
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_nb)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix nb")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the svm-l model:
+
+library(kernlab)
+
+set.seed(155294099)
+model_svm_l <- train(
+  Class~., 
+  data=all_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="svmLinear",
+  na.action = na.omit
+  )
+```
+
+Display info about svm-l model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_svm_l$method
+model_svm_l$finalModel
+model_svm_l$resample$ROC
+confusionMatrix(model_svm_l)
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_svm_l)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix svm-l")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the svm-r model:
+
+library(kernlab)
+
+set.seed(155294099)
+model_svm_r <- train(
+  Class~., 
+  data=all_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="svmRadialCost",
+  na.action = na.omit
+  )
+
+```
+
+Display info about svm-r model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_svm_r$method
+model_svm_r$finalModel
+model_svm_r$resample$ROC
+confusionMatrix(model_svm_r)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_svm_r)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix svm-r")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the rf model:
+
+library(randomForest)
+
+set.seed(155294099)
+model_rf <- train(
+  Class~., 
+  data=all_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="rf",
+  na.action = na.omit
+  )
+
+```
+
+Display info about rf model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_rf$method
+model_rf$finalModel
+model_rf$resample$ROC
+confusionMatrix(model_rf)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_rf)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix rf")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+
+
+Let us display ROC curves for the all created ML methods:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+library(pROC)
+
+set.seed(2)
+ind = sample(2, nrow(all_dt), replace = TRUE, prob=c(0.9,0.1))
+trainset = as.data.frame( all_dt[ind == 1,] )
+testset = as.data.frame( all_dt[ind == 2,] )
+
+
+k_nn_prediction = predict(model_k_nn, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+k_nn_ROC = roc(response = head(testset, nrow(k_nn_prediction))[,c("Class")],
+               predictor = k_nn_prediction$MALIGNANT,
+               levels = levels(testset[ ,"Class"]))
+plot(k_nn_ROC, type="S", col="red")
+
+
+nb_prediction = predict(model_nb, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+nb_ROC = roc(response = head(testset, nrow(nb_prediction))[,c("Class")],
+               predictor = nb_prediction$MALIGNANT,
+               levels = levels(testset[ ,"Class"]))
+plot(nb_ROC, add=TRUE, col="orange")
+
+
+svm_l_prediction = predict(model_svm_l, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+svm_l_ROC = roc(response = head(testset, nrow(svm_l_prediction))[,c("Class")],
+               predictor = svm_l_prediction$MALIGNANT,
+               levels = levels(testset[ ,"Class"]))
+plot(svm_l_ROC, add=TRUE, col="blue")
+
+
+svm_r_prediction = predict(model_svm_r, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+svm_r_ROC = roc(response = head(testset, nrow(svm_r_prediction))[,c("Class")],
+               predictor = svm_r_prediction$MALIGNANT,
+               levels = levels(testset[ ,"Class"]))
+plot(svm_r_ROC, add=TRUE, col="darkblue")
+
+rf_prediction = predict(model_rf, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+rf_ROC = roc(response = head(testset, nrow(rf_prediction))[,c("Class")],
+               predictor = rf_prediction$MALIGNANT,
+               levels = levels(testset[ ,"Class"]))
+plot(rf_ROC, add=TRUE, col="green")
+title("ROC curves")
+legend("topleft", legend=c("k-nn", "nb", "svm-l", "svm-r", "rf"),
+       col=c("red", "orange", "blue", "darkblue", "green"),  
+       lty=1:5, cex=0.8)
+
+```
+
+
+
+Compare ROC values of all models:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+model_list <- list("k-nn" = model_k_nn, "nb" = model_nb, "svm-l"= model_svm_l, "svm-r"= model_svm_r, "rf"= model_rf)
+res <- resamples( model_list )
+res$values
+summary(res)
+```
+
+Obtained results can be visualized:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dotplot(res, metric = "ROC")
+
+bwplot(res, layout = c(3, 1))
+```
+
+Moreover, calculated ROC distributions should be visualized:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+res_df <- as.data.frame(res$values)
+res_df$"k-nn~Sens" <- NULL
+res_df$"k-nn~Spec" <- NULL
+res_df$"nb~Sens" <- NULL
+res_df$"nb~Spec" <- NULL
+res_df$"svm-l~Sens" <- NULL
+res_df$"svm-l~Spec" <- NULL
+res_df$"svm-r~Sens" <- NULL
+res_df$"svm-r~Spec" <- NULL
+res_df$"rf~Sens" <- NULL
+res_df$"rf~Spec" <- NULL
+res_dt <- as.data.table(res_df)
+res_dt <- melt(res_dt, id.vars = c('Resample'), 
+     measure.vars = c('k-nn~ROC', 'nb~ROC', 'svm-l~ROC', 'svm-r~ROC', 'rf~ROC') )
+res_dt[variable == 'k-nn~ROC', variable := 'k-nn']
+res_dt[variable == 'nb~ROC', variable := 'nb']
+res_dt[variable == 'svm-l~ROC', variable := 'svm-l']
+res_dt[variable == 'svm-r~ROC', variable := 'svm-r']
+res_dt[variable == 'rf~ROC', variable := 'rf']
+res_dt%>%setnames("variable", "method")
+ggplot(data=res_dt, aes(x=value, group=method, fill=method)) +
+    geom_density(adjust=1.5, alpha=.4) +
+    xlab("ROC") +
+    ylab("value") + 
+    scale_fill_manual(values=c("red", "orange", "blue", "darkblue", 'green')) +
+    ggtitle("ROC distribution by model") 
+```
+
+
+
+
+### References
+
+
+
+

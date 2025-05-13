@@ -1,0 +1,73 @@
+<deployment-project plugin="plugin.apptool" plugin-version="1.0">
+  <configuration build-checksum="4104276147" file="C:\Users\Administrator\Documents\_Sanja\Bicocca - studio\Data Science\II_anno\02_MedicalImagning_BigData\project\GUI Application.prj" location="C:\Users\Administrator\Documents\_Sanja\Bicocca - studio\Data Science\II_anno\02_MedicalImagning_BigData\project" name="GUI Application" target="target.mlapps" target-name="Package App">
+    <param.appname>GUI Application</param.appname>
+    <param.authnamewatermark>Sanja Stanisic</param.authnamewatermark>
+    <param.email />
+    <param.company>Bicoccca</param.company>
+    <param.icon />
+    <param.icons />
+    <param.summary />
+    <param.description />
+    <param.screenshot>C:\Users\Administrator\AppData\Local\Temp\tp4fe8a75c_7d68_4d27_8396_1f7b05f4e83d.png</param.screenshot>
+    <param.version>1.0</param.version>
+    <param.products.name />
+    <param.products.id />
+    <param.products.version />
+    <param.platforms />
+    <param.output>${PROJECT_ROOT}\app</param.output>
+    <param.guid>ac6cb2dc-2eb5-49fb-8815-f9cdcb623b2a</param.guid>
+    <unset>
+      <param.email />
+      <param.icon />
+      <param.icons />
+      <param.summary />
+      <param.description />
+      <param.version />
+      <param.products.name />
+      <param.products.id />
+      <param.products.version />
+      <param.platforms />
+    </unset>
+    <fileset.main>
+      <file>${PROJECT_ROOT}\project_GUI_App_01.mlapp</file>
+    </fileset.main>
+    <fileset.depfun>
+      <file>${PROJECT_ROOT}\assets\flipH.png</file>
+      <file>${PROJECT_ROOT}\assets\flipV.png</file>
+      <file>${PROJECT_ROOT}\assets\rotateC.png</file>
+      <file>${PROJECT_ROOT}\assets\rotateCC.png</file>
+    </fileset.depfun>
+    <fileset.resources />
+    <fileset.package />
+    <build-deliverables>
+      <file location="${PROJECT_ROOT}" name="app" optional="false">C:\Users\Administrator\Documents\_Sanja\Bicocca - studio\Data Science\II_anno\02_MedicalImagning_BigData\project\app</file>
+    </build-deliverables>
+    <workflow />
+    <matlab>
+      <root>C:\Program Files\MATLAB\R2021a</root>
+      <toolboxes>
+        <toolbox name="neuralnetwork" />
+      </toolboxes>
+      <toolbox>
+        <neuralnetwork>
+          <enabled>true</enabled>
+        </neuralnetwork>
+      </toolbox>
+    </matlab>
+    <platform>
+      <unix>false</unix>
+      <mac>false</mac>
+      <windows>true</windows>
+      <win2k>false</win2k>
+      <winxp>false</winxp>
+      <vista>false</vista>
+      <linux>false</linux>
+      <solaris>false</solaris>
+      <osver>10.0</osver>
+      <os32>false</os32>
+      <os64>true</os64>
+      <arch>win64</arch>
+      <matlab>true</matlab>
+    </platform>
+  </configuration>
+</deployment-project>
